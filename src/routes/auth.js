@@ -12,19 +12,19 @@ router.post('/register', validate([
   { field: 'username', required: true, min: 3, max: 20, message: '用户名长度需要3-20位' },
   { field: 'password', required: true, min: 6, max: 32, message: '密码长度需要6-32位' },
   { field: 'email', type: 'email', required: true, message: '邮箱格式不正确' },
-]), (req, res, next) => {
+]), async (req, res, next) => {
   try {
     const { username, password, email } = req.body;
 
-    if (db.findUserByUsername(username)) {
+    if (await db.findUserByUsername(username)) {
       return res.status(409).json({ code: 409, message: '用户名已存在' });
     }
-    if (db.findUserByEmail(email)) {
+    if (await db.findUserByEmail(email)) {
       return res.status(409).json({ code: 409, message: '邮箱已存在' });
     }
 
-    const hashed = bcrypt.hashSync(password, 10);
-    const user = db.createUser({ username, email, password: hashed });
+    const hashed = await bcrypt.hash(password, 10);
+    const user = await db.createUser({ username, email, password: hashed });
 
     res.status(201).json({ code: 201, message: '注册成功', data: { id: user.id } });
   } catch (err) {
@@ -36,11 +36,11 @@ router.post('/register', validate([
 router.post('/login', validate([
   { field: 'username', required: true, message: '用户名不能为空' },
   { field: 'password', required: true, message: '密码不能为空' },
-]), (req, res, next) => {
+]), async (req, res, next) => {
   try {
     const { username, password } = req.body;
 
-    const user = db.findUserByUsername(username);
+    const user = await db.findUserByUsername(username);
     if (!user) {
       return res.status(401).json({ code: 401, message: '用户名或密码错误' });
     }
@@ -49,7 +49,7 @@ router.post('/login', validate([
       return res.status(403).json({ code: 403, message: '账号已被禁用，请联系管理员' });
     }
 
-    if (!bcrypt.compareSync(password, user.password)) {
+    if (!(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ code: 401, message: '用户名或密码错误' });
     }
 

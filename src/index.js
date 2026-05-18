@@ -3,9 +3,6 @@ const cors = require('cors');
 const config = require('./config');
 const errorHandler = require('./middleware/errorHandler');
 
-// Ensure db is initialized (creates data file, seeds products & default admin)
-const db = require('./db');
-
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const profileRoutes = require('./routes/profile');
@@ -36,20 +33,13 @@ app.get('/api/health', (_req, res) => {
 // Error handler
 app.use(errorHandler);
 
-const server = app.listen(config.port, () => {
-  console.log(`TrendShop API running at http://localhost:${config.port}`);
-});
+// Vercel serverless export
+module.exports = app;
 
-// Graceful shutdown — close DB so WAL is checkpointed to .db file
-function shutdown(signal) {
-  console.log(`\nReceived ${signal}, shutting down gracefully...`);
-  server.close(() => {
-    db.close();
-    console.log('Database closed. Goodbye.');
-    process.exit(0);
+// Local development server
+if (config.localDev) {
+  const port = config.port;
+  app.listen(port, () => {
+    console.log(`TrendShop API running at http://localhost:${port}`);
   });
-  setTimeout(() => process.exit(1), 5000); // force exit after 5s
 }
-
-process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
