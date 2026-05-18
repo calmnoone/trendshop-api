@@ -1,6 +1,6 @@
 const config = require('../config');
 const bcrypt = require('bcryptjs');
-const { createClient } = require('@libsql/client');
+const { createClient } = require('@libsql/client/http');
 
 let client = null;
 let initPromise = null;
@@ -239,7 +239,7 @@ module.exports = {
         args: [userId],
       });
       await tx.commit();
-      return exports.findUser(userId);
+      return self.findUser(userId);
     } finally {
       tx.close();
     }
@@ -247,7 +247,7 @@ module.exports = {
 
   async updateUser(id, fields) {
     await ensureInitialized();
-    const user = await exports.findUser(id);
+    const user = await self.findUser(id);
     if (!user) return null;
     const sets = [];
     const vals = [];
@@ -259,12 +259,12 @@ module.exports = {
       vals.push(id);
       await getClient().execute({ sql: `UPDATE users SET ${sets.join(', ')} WHERE id = ?`, args: vals });
     }
-    return exports.findUser(id);
+    return self.findUser(id);
   },
 
   async updateProfile(id, fields) {
     await ensureInitialized();
-    const user = await exports.findUser(id);
+    const user = await self.findUser(id);
     if (!user) return null;
     const sets = [];
     const vals = [];
@@ -275,12 +275,12 @@ module.exports = {
       vals.push(id);
       await getClient().execute({ sql: `UPDATE user_profiles SET ${sets.join(', ')} WHERE user_id = ?`, args: vals });
     }
-    return exports.findUser(id);
+    return self.findUser(id);
   },
 
   async deleteUser(id) {
     await ensureInitialized();
-    const user = await exports.findUser(id);
+    const user = await self.findUser(id);
     if (!user) return false;
     await getClient().execute({ sql: 'DELETE FROM users WHERE id = ?', args: [id] });
     return true;
@@ -357,7 +357,7 @@ module.exports = {
   async addToCart(userId, { productId, quantity = 1 }) {
     await ensureInitialized();
     const c = getClient();
-    const product = await exports.findProduct(productId);
+    const product = await self.findProduct(productId);
     if (!product) return { error: '商品不存在' };
     const existingRs = await c.execute({
       sql: 'SELECT * FROM cart_items WHERE user_id = ? AND product_id = ?',
@@ -374,7 +374,7 @@ module.exports = {
         args: [userId, productId, quantity, formatDate(new Date())],
       });
     }
-    return exports.getCartDetail(userId);
+    return self.getCartDetail(userId);
   },
 
   async updateCartItem(userId, productId, quantity) {
@@ -385,12 +385,12 @@ module.exports = {
       args: [userId, productId],
     });
     if (!existingRs.rows[0]) return { error: '购物车中无此商品' };
-    if (quantity <= 0) return exports.removeCartItem(userId, productId);
+    if (quantity <= 0) return self.removeCartItem(userId, productId);
     await c.execute({
       sql: 'UPDATE cart_items SET quantity = ? WHERE user_id = ? AND product_id = ?',
       args: [quantity, userId, productId],
     });
-    return exports.getCartDetail(userId);
+    return self.getCartDetail(userId);
   },
 
   async removeCartItem(userId, productId) {
@@ -399,7 +399,7 @@ module.exports = {
       sql: 'DELETE FROM cart_items WHERE user_id = ? AND product_id = ?',
       args: [userId, productId],
     });
-    return exports.getCartDetail(userId);
+    return self.getCartDetail(userId);
   },
 
   async clearCart(userId) {
@@ -432,7 +432,7 @@ module.exports = {
   async createOrder(userId, { items, address, note }) {
     await ensureInitialized();
     const c = getClient();
-    const user = await exports.findUser(userId);
+    const user = await self.findUser(userId);
     if (!user) return { error: '用户不存在' };
 
     const tx = await c.transaction('write');
@@ -490,7 +490,7 @@ module.exports = {
       await tx.commit();
 
       // Fetch the created order outside the transaction
-      return exports.getOrder(orderId);
+      return self.getOrder(orderId);
     } finally {
       tx.close();
     }
@@ -566,13 +566,13 @@ module.exports = {
 
   async addToWishlist(userId, productId) {
     await ensureInitialized();
-    const product = await exports.findProduct(productId);
+    const product = await self.findProduct(productId);
     if (!product) return { error: '商品不存在' };
     await getClient().execute({
       sql: 'INSERT OR IGNORE INTO wishlists (user_id, product_id) VALUES (?,?)',
       args: [userId, productId],
     });
-    return exports.getWishlist(userId);
+    return self.getWishlist(userId);
   },
 
   async removeFromWishlist(userId, productId) {
@@ -581,7 +581,7 @@ module.exports = {
       sql: 'DELETE FROM wishlists WHERE user_id = ? AND product_id = ?',
       args: [userId, productId],
     });
-    return exports.getWishlist(userId);
+    return self.getWishlist(userId);
   },
 
   close() {
@@ -594,4 +594,4 @@ module.exports = {
 };
 
 // Self-reference for internal calls (createUser → findUser, etc.)
-const exports = module.exports;
+const self = module.exports;
